@@ -51,6 +51,7 @@ namespace InactiviteRoleRemover
                 var guild = _discord.GetGuild(742829434486390835);
                 if (guild != null)
                 {
+                    var inactiveRole = guild.Roles.Where(r => r.Id == 806693949342875688).FirstOrDefault();
                     foreach (var user in guild.Users)
                     {
                         // If their ID is either not in the database, or their Last Activity is null or was more than 30 days ago, and they don't already have a list of roles to give back
@@ -59,13 +60,16 @@ namespace InactiviteRoleRemover
                         {
                             if (TargetHasHigherPerms(user.GuildPermissions, guild.CurrentUser.GuildPermissions)) // Don't mess with admins
                             {
+                                Console.WriteLine("Would remove roles for " + user.Nickname);
                                 // Remove their roles and store them to give them back later
-                                _context.Update(dbUser);
-                                foreach (var role in user.Roles)
-                                {
-                                    dbUser.RoleIdsToRestore.Add(role.Id);
-                                }
-                                await user.RemoveRolesAsync(user.Roles);
+                                //_context.Update(dbUser);
+                                //foreach (var role in user.Roles)
+                                //{
+                                //    dbUser.RoleIdsToRestore.Add(role.Id);
+                                //}
+                                //await user.RemoveRolesAsync(user.Roles);
+                                //if (inactiveRole != null)
+                                //    await user.AddRoleAsync(inactiveRole);
                             }
                         }
                         
@@ -116,6 +120,7 @@ namespace InactiviteRoleRemover
             {
                 _context.Update(matchingUser);
                 var guild = _discord.GetGuild(742829434486390835);
+                var inactiveRole = guild.Roles.Where(r => r.Id == 806693949342875688).FirstOrDefault();
                 if (matchingUser.RoleIdsToRestore != null)
                 {
                     // They spoke after being inactive for a while, restore their roles
@@ -126,7 +131,7 @@ namespace InactiviteRoleRemover
                         if (matchingUser.RoleIdsToRestore.Any(r => r == role.Id))
                             roles.Add(role);
                     }
-
+                    await guild.GetUser(user.Id).RemoveRoleAsync(inactiveRole);
                     await guild.GetUser(user.Id).AddRolesAsync(roles);
                     matchingUser.RoleIdsToRestore = null;
                 }
@@ -156,13 +161,17 @@ namespace InactiviteRoleRemover
                     // They spoke after being inactive for a while, restore their roles
                     // First make a list of all the roles
                     List<IRole> roles = new List<IRole>();
-                    foreach(var role in context.Guild.Roles)
+                    var inactiveRole = context.Guild.Roles.Where(r => r.Id == 806693949342875688).FirstOrDefault();
+                    bool hasInactiveRole = context.Guild.GetUser(msg.Author.Id).Roles.Any(r => r.Id == inactiveRole.Id);
+                    foreach (var role in context.Guild.Roles)
                     {
                         if (matchingUser.RoleIdsToRestore.Any(r => r == role.Id))
                             roles.Add(role);
                     }
 
                     await context.Guild.GetUser(msg.Author.Id).AddRolesAsync(roles);
+                    if (inactiveRole != null && hasInactiveRole)
+                        await context.Guild.GetUser(msg.Author.Id).RemoveRoleAsync(inactiveRole);
                     matchingUser.RoleIdsToRestore = null;
                 }
                 matchingUser.LastActivity = DateTime.Now;
