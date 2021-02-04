@@ -20,6 +20,13 @@ namespace InactiviteRoleRemover
 
         private DateTime StartDate = new DateTime(2021, 2, 3);
 
+
+        private class WatchingActivity : IActivity
+        {
+            public string Name { get; set; }
+            public ActivityType Type { get; set; }
+        }
+
         // DiscordSocketClient, CommandService, IConfigurationRoot, and IServiceProvider are injected automatically from the IServiceProvider
         public CommandHandler(
             DiscordSocketClient discord,
@@ -35,11 +42,50 @@ namespace InactiviteRoleRemover
 
             _discord.MessageReceived += OnMessageReceivedAsync;
             _discord.UserVoiceStateUpdated += _discord_UserVoiceStateUpdated;
+            _discord.UserJoined += _discord_UserJoined;
 
             _context = context;
             // Do this immediately once on startup
             Timer t = new Timer(PurgeMembers, null, 0, (int)TimeSpan.FromHours(24).TotalMilliseconds);
-            
+            Task.Run(async () => await _discord.SetActivityAsync(new WatchingActivity() { Type = ActivityType.Watching, Name = "..." }));
+            // 👀
+        }
+
+        private async Task _discord_UserJoined(SocketGuildUser user)
+        {
+            var matchingUser = _context.Users.Where(u => u.DiscordId == user.Id).FirstOrDefault();
+            if (matchingUser == null)
+            {
+                _context.Users.Add(new User() { DiscordId = user.Id, LastActivity = DateTime.Now, Nickname = user.Nickname });
+            }
+            else
+            {
+                _context.Update(matchingUser);
+                var guild = _discord.GetGuild(742829434486390835);
+                var inactiveRole = guild.Roles.Where(r => r.Id == 806693949342875688).FirstOrDefault();
+                // Don't give them any roles if they just joined the server
+                //if (matchingUser.RoleIdsToRestore != null)
+                //{
+                //    // They spoke after being inactive for a while, restore their roles
+                //    // First make a list of all the roles
+                //    List<IRole> roles = new List<IRole>();
+                //    foreach (var role in guild.Roles)
+                //    {
+                //        if (matchingUser.RoleIdsToRestore.Any(r => r == role.Id))
+                //            roles.Add(role);
+                //    }
+                //    await guild.GetUser(user.Id).RemoveRoleAsync(inactiveRole);
+                //    await guild.GetUser(user.Id).AddRolesAsync(roles);
+                //    matchingUser.RoleIdsToRestore = null;
+                //}
+                matchingUser.LastActivity = DateTime.Now;
+            }
+            await _context.SaveChangesAsync();
+            await _discord.SetActivityAsync(new WatchingActivity() { Type = ActivityType.Watching, Name = "👀" });
+            await Task.Run(async () => {
+                await Task.Delay(500);
+                await _discord.SetActivityAsync(new WatchingActivity() { Type = ActivityType.Watching, Name = "..." });
+            });
         }
 
         private async void PurgeMembers(object state)
@@ -56,20 +102,26 @@ namespace InactiviteRoleRemover
                     {
                         // If their ID is either not in the database, or their Last Activity is null or was more than 30 days ago, and they don't already have a list of roles to give back
                         var dbUser = _context.Users.Where(u => u.DiscordId == user.Id).FirstOrDefault();
-                        if (dbUser == null || dbUser.LastActivity == null || (DateTime.Now - dbUser.LastActivity > TimeSpan.FromDays(30) && dbUser.RoleIdsToRestore == null))
+                        if (dbUser != null || dbUser.LastActivity == null || (DateTime.Now - dbUser.LastActivity > TimeSpan.FromDays(30) && dbUser.RoleIdsToRestore == null))
                         {
-                            if (TargetHasHigherPerms(user.GuildPermissions, guild.CurrentUser.GuildPermissions)) // Don't mess with admins
+                            if (!TargetHasHigherPerms(user.GuildPermissions, guild.CurrentUser.GuildPermissions)) // Don't mess with admins
                             {
-                                Console.WriteLine("Would remove roles for " + user.Nickname);
+                                Console.WriteLine("Removing roles for " + user.Nickname);
                                 // Remove their roles and store them to give them back later
-                                //_context.Update(dbUser);
-                                //foreach (var role in user.Roles)
-                                //{
-                                //    dbUser.RoleIdsToRestore.Add(role.Id);
-                                //}
-                                //await user.RemoveRolesAsync(user.Roles);
-                                //if (inactiveRole != null)
-                                //    await user.AddRoleAsync(inactiveRole);
+                                _context.Update(dbUser);
+                                dbUser.RoleIdsToRestore = new List<ulong>();
+                                List<IRole> rolesToRemove = new List<IRole>();
+                                foreach (var role in user.Roles)
+                                {
+                                    if (!role.IsEveryone)
+                                    {
+                                        dbUser.RoleIdsToRestore.Add(role.Id);
+                                        rolesToRemove.Add(role);
+                                    }
+                                }
+                                await user.RemoveRolesAsync(rolesToRemove);
+                                if (inactiveRole != null)
+                                    await user.AddRoleAsync(inactiveRole);
                             }
                         }
                         
@@ -114,7 +166,7 @@ namespace InactiviteRoleRemover
             var matchingUser = _context.Users.Where(u => u.DiscordId == user.Id).FirstOrDefault();
             if (matchingUser == null)
             {
-                _context.Users.Add(new User() { DiscordId = user.Id, LastActivity = DateTime.Now });
+                _context.Users.Add(new User() { DiscordId = user.Id, LastActivity = DateTime.Now, Nickname = user.Username });
             }
             else
             {
@@ -151,7 +203,7 @@ namespace InactiviteRoleRemover
             var matchingUser = _context.Users.Where(u => u.DiscordId == msg.Author.Id).FirstOrDefault();
             if (matchingUser == null)
             {
-                _context.Users.Add(new User() { DiscordId = msg.Author.Id, LastActivity = DateTime.Now });
+                _context.Users.Add(new User() { DiscordId = msg.Author.Id, LastActivity = DateTime.Now, Nickname = msg.Author.Username });
             }
             else
             {
@@ -177,7 +229,15 @@ namespace InactiviteRoleRemover
                 matchingUser.LastActivity = DateTime.Now;
             }
             await _context.SaveChangesAsync();
+            await _discord.SetActivityAsync(new WatchingActivity() { Type = ActivityType.Watching, Name = "👀" });
+            await Task.Run(async () => {  
+                await Task.Delay(500);
+                await _discord.SetActivityAsync(new WatchingActivity() { Type = ActivityType.Watching, Name = "..." });
+            });
 
+            // If it was a message in the Inactive channel, delete it immediately
+            if (msg.Channel.Id == 806703755466637322)
+                await msg.DeleteAsync();
             
 
             int argPos = 0;     // Check if the message has a valid command prefix

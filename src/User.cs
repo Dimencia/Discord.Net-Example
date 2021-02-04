@@ -10,5 +10,6 @@ namespace InactiviteRoleRemover
         public DateTime LastActivity { get; set; }
         public List<ulong> RoleIdsToRestore { get; set; }
         public Guid Id { get; set; }
+        public string Nickname { get; set; }
     }
 }
