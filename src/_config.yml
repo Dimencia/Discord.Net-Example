@@ -2,4 +2,4 @@
 prefix: "!"
 connectionstring: 'Server=localhost\SQLEXPRESS;Database=inactivity;Integrated Security=True;'
 tokens:
-    discord: "ODA2Njc1NzgxNjc2Njk1NTYy.YBs5XQ.dI9c0Ri-phNOThWXahX0T3Q2WoU"
+    discord: ""
