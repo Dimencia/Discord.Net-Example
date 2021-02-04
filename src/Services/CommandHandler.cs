@@ -6,6 +6,7 @@ using System;
 using System.Linq;
 using System.Threading;
 using Discord;
+using System.Collections.Generic;
 
 namespace InactiviteRoleRemover
 {
@@ -47,7 +48,7 @@ namespace InactiviteRoleRemover
             // Assuming it's at least 30 days past the start date.  
             if (DateTime.Now > StartDate + TimeSpan.FromDays(30))
             {
-                var guild = _discord.Guilds.Where(g => g.Id == 742829434486390835).FirstOrDefault();
+                var guild = _discord.GetGuild(742829434486390835);
                 if (guild != null)
                 {
                     foreach (var user in guild.Users)
@@ -114,6 +115,21 @@ namespace InactiviteRoleRemover
             else
             {
                 _context.Update(matchingUser);
+                var guild = _discord.GetGuild(742829434486390835);
+                if (matchingUser.RoleIdsToRestore != null)
+                {
+                    // They spoke after being inactive for a while, restore their roles
+                    // First make a list of all the roles
+                    List<IRole> roles = new List<IRole>();
+                    foreach (var role in guild.Roles)
+                    {
+                        if (matchingUser.RoleIdsToRestore.Any(r => r == role.Id))
+                            roles.Add(role);
+                    }
+
+                    await guild.GetUser(user.Id).AddRolesAsync(roles);
+                    matchingUser.RoleIdsToRestore = null;
+                }
                 matchingUser.LastActivity = DateTime.Now;
             }
             await _context.SaveChangesAsync();
@@ -125,6 +141,8 @@ namespace InactiviteRoleRemover
             if (msg == null) return;
             if (msg.Author.Id == _discord.CurrentUser.Id) return;     // Ignore self when checking commands
 
+            var context = new SocketCommandContext(_discord, msg);     // Create the command context
+
             var matchingUser = _context.Users.Where(u => u.DiscordId == msg.Author.Id).FirstOrDefault();
             if (matchingUser == null)
             {
@@ -133,11 +151,25 @@ namespace InactiviteRoleRemover
             else
             {
                 _context.Update(matchingUser);
+                if (matchingUser.RoleIdsToRestore != null)
+                {
+                    // They spoke after being inactive for a while, restore their roles
+                    // First make a list of all the roles
+                    List<IRole> roles = new List<IRole>();
+                    foreach(var role in context.Guild.Roles)
+                    {
+                        if (matchingUser.RoleIdsToRestore.Any(r => r == role.Id))
+                            roles.Add(role);
+                    }
+
+                    await context.Guild.GetUser(msg.Author.Id).AddRolesAsync(roles);
+                    matchingUser.RoleIdsToRestore = null;
+                }
                 matchingUser.LastActivity = DateTime.Now;
             }
             await _context.SaveChangesAsync();
 
-            var context = new SocketCommandContext(_discord, msg);     // Create the command context
+            
 
             int argPos = 0;     // Check if the message has a valid command prefix
             if (msg.HasStringPrefix(_config["prefix"], ref argPos) || msg.HasMentionPrefix(_discord.CurrentUser, ref argPos))
