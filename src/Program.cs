@@ -1,6 +1,6 @@
 ﻿using System.Threading.Tasks;
 
-namespace Example
+namespace InactiviteRoleRemover
 {
     class Program
     {

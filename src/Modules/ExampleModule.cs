@@ -3,16 +3,11 @@ using Discord.Commands;
 using Discord.WebSocket;
 using System.Threading.Tasks;
 
-namespace Example.Modules
+namespace InactiviteRoleRemover.Modules
 {
     [Name("Example")]
     public class ExampleModule : ModuleBase<SocketCommandContext>
     {
-        [Command("say"), Alias("s")]
-        [Summary("Make the bot say something")]
-        [RequireUserPermission(GuildPermission.Administrator)]
-        public Task Say([Remainder]string text)
-            => ReplyAsync(text);
         
         [Group("set"), Name("Example")]
         [RequireContext(ContextType.Guild)]

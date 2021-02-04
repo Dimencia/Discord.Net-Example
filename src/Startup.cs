@@ -1,12 +1,15 @@
 ﻿using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Discord;
 using Discord.Commands;
 using Discord.WebSocket;
+
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Example
+namespace InactiviteRoleRemover
 {
     public class Startup
     {
@@ -19,6 +22,7 @@ namespace Example
                 .AddYamlFile("_config.yml");                // Add this (yaml encoded) file to the configuration
             Configuration = builder.Build();                // Build the configuration
         }
+
 
         public static async Task RunAsync(string[] args)
         {
@@ -55,7 +59,9 @@ namespace Example
             .AddSingleton<StartupService>()         // Add startupservice to the collection
             .AddSingleton<LoggingService>()         // Add loggingservice to the collection
             .AddSingleton<Random>()                 // Add random to the collection
-            .AddSingleton(Configuration);           // Add the configuration to the collection
+            .AddSingleton(Configuration)
+            .AddDbContextPool<UserContext>(options =>
+                options.UseSqlServer(Configuration["connectionstring"]));           // Add the configuration to the collection
         }
     }
 }

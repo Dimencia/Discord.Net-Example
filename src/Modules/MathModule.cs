@@ -2,7 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 
-namespace Example.Modules
+namespace InactiviteRoleRemover.Modules
 {
     [Name("Math")]
     [Summary("Do some math I guess")]
