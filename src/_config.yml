@@ -1,5 +1,0 @@
-﻿uselesstag: "something"
-prefix: "!"
-connectionstring: 'Server=localhost\SQLEXPRESS;Database=inactivity;Integrated Security=True;'
-tokens:
-    discord: "what"
